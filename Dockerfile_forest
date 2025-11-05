@@ -1,0 +1,33 @@
+# ============================================================================
+# Dockerfile: Forest Plot Analysis - Gastric Cancer
+# Base: rocker/r-ver:4.3.0
+# Purpose: Complete Cox regression + forest plot analysis
+# ============================================================================
+
+FROM rocker/r-ver:4.3.0
+
+WORKDIR /workspace
+
+RUN apt-get update && apt-get install -y \
+    libcurl4-openssl-dev libssl-dev libxml2-dev \
+    libfontconfig1-dev libharfbuzz-dev libfribidi-dev \
+    libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev \
+    wget gzip && rm -rf /var/lib/apt/lists/*
+
+# Install BiocManager
+RUN R -e "install.packages('BiocManager', repos='https://cloud.r-project.org/')"
+
+# Install Bioconductor packages
+RUN R -e "BiocManager::install(c('GEOquery', 'limma'), ask=FALSE, update=FALSE)"
+
+# Install CRAN packages
+RUN R -e "install.packages(c('survival', 'survminer', 'ggplot2', 'dplyr'), repos='https://cloud.r-project.org/')"
+
+# Create input/output directories
+RUN mkdir -p /workspace/input_data
+
+# Copy script
+COPY expert_solution_forest.R /workspace/
+
+ENTRYPOINT ["/usr/local/bin/Rscript"]
+CMD ["expert_solution_forest.R"]
