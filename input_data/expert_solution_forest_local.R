@@ -81,8 +81,6 @@ cat("Censored:", sum(cox_data$status == 0), "\n\n")
 
 # Standardize continuous variables
 cox_data$LMOD1 <- scale(cox_data$LMOD1)[,1]
-cox_data$Age <- scale(cox_data$Age)[,1]
-
 # ============================================================================
 # Fit Cox model
 # ============================================================================
