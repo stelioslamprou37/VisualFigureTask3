@@ -110,7 +110,7 @@ if [ -f "${FILEPATH}" ]; then
     echo "Lines: ${LINE_COUNT}"
     echo ""
     echo "Next steps:"
-    echo "  1. Run analysis: Rscript forest_plot_analysis.R"
+    echo "  1. Run analysis: Expert_Solution_RScript.R"
     echo "  2. Output will be saved in output/ directory"
     echo "============================================================================"
 else
