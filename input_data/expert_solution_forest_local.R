@@ -1,225 +1,159 @@
-
-# Set data directory
-
 suppressPackageStartupMessages({
   library(GEOquery)
   library(limma)
   library(survival)
-  library(survminer)
   library(ggplot2)
   library(dplyr)
 })
 
 cat("============================================================================\n")
-cat("Forest Plot Analysis - LOCAL VERSION (Windows)\n")
-cat("Paper: Discovery Oncology 2025\n")
-cat("Dataset: GSE84437 (433 samples)\n")
+cat("Panel A: Multivariate Cox Regression - Forest Plot\n")
 cat("============================================================================\n\n")
+
+# Load data
 data_file <- "C:/Users/steli/Desktop/Figure Reproduction Project - Copy/input_data/GSE84437_series_matrix.txt"
 
-if(!file.exists(data_file)) {
-  stop("ERROR: File not found at ", data_file)
-}
-
 gse84437 <- getGEO(filename = data_file, GSEMatrix = TRUE)
-
 expr_data <- exprs(gse84437)
 pdata <- pData(gse84437)
 fdata <- fData(gse84437)
 
-cat("  ✓ Loaded:", nrow(expr_data), "probes x", ncol(expr_data), "samples\n\n")
+cat(" ✓ Loaded:", nrow(expr_data), "probes x", ncol(expr_data), "samples\n\n")
 
 # ============================================================================
-# Step 2: Extract survival data (CORRECTED COLUMNS)
+# Apply log2 transformation (CRITICAL - paper uses this!)
 # ============================================================================
 
-cat("Step 2: Extracting survival data...\n")
+cat("Step 1: Applying log2 transformation to expression data...\n")
 
-# CORRECT COLUMNS:
+expr_data_log <- log2(expr_data + 1)  # +1 to avoid log(0)
+
+cat("Step 2: Finding LMOD1 probe...\n")
+
+lmod1_probe_id <- which(grepl("LMOD1", fdata$Symbol, ignore.case = TRUE))[1]
+cat("Using LMOD1 probe:", rownames(fdata)[lmod1_probe_id], "\n\n")
+
+# ============================================================================
+# Extract clinical data
+# ============================================================================
+
+cat("Step 3: Extracting survival and clinical data...\n")
+
 survival_status <- as.numeric(pdata[["death:ch1"]])
 survival_time <- as.numeric(pdata[["duration overall survival:ch1"]])
 
-cat("  Samples:", length(survival_time), "\n")
-cat("  Events (death=1):", sum(survival_status == 1, na.rm = TRUE), "\n")
-cat("  Censored (death=0):", sum(survival_status == 0, na.rm = TRUE), "\n\n")
+survival_idx <- which(!is.na(survival_time) & !is.na(survival_status))
+cat("Samples with survival data:", length(survival_idx), "\n")
+
+age <- as.numeric(pdata[survival_idx, "age:ch1"])
+gender_raw <- as.character(pdata[survival_idx, "Sex:ch1"])
+t_stage <- as.numeric(gsub("[^0-9]", "", pdata[survival_idx, "ptstage:ch1"]))
+n_stage <- as.numeric(gsub("[^0-9]", "", pdata[survival_idx, "pnstage:ch1"]))
+lmod1_expr <- as.numeric(expr_data_log[lmod1_probe_id, survival_idx])  # Use LOG-TRANSFORMED data
+
+cat("Unique gender values:", paste(unique(gender_raw), collapse = ", "), "\n\n")
 
 # ============================================================================
-# Step 2: Extract survival data
+# Prepare Cox data
 # ============================================================================
 
-cat("Step 2: Extracting survival data...\n")
+cat("Step 4: Building Cox data frame...\n")
 
-survival_status <- as.numeric(pdata[["death:ch1"]])
-survival_time <- as.numeric(pdata[["duration overall survival:ch1"]])
+gender_numeric <- as.numeric(factor(gender_raw, levels = rev(unique(gender_raw)))) - 1
 
-cat("  Samples:", length(survival_time), "\n")
-cat("  Events:", sum(survival_status == 1, na.rm = TRUE), "\n\n")
+cox_data <- data.frame(
+  time = survival_time[survival_idx],
+  status = survival_status[survival_idx],
+  LMOD1 = lmod1_expr,
+  Age = age,
+  Gender = gender_numeric,
+  T_stage = t_stage,
+  N_stage = n_stage,
+  stringsAsFactors = FALSE
+)
 
-# ============================================================================
-# Step 3: Preprocessing
-# ============================================================================
+valid_rows <- complete.cases(cox_data)
+cox_data <- cox_data[valid_rows, ]
 
-cat("Step 3: Preprocessing...\n")
+cat("Valid samples:", nrow(cox_data), "\n")
+cat("Events:", sum(cox_data$status == 1), "\n")
+cat("Censored:", sum(cox_data$status == 0), "\n\n")
 
-# Filter low-variance probes
-probe_vars <- apply(expr_data, 1, var, na.rm = TRUE)
-expr_filtered <- expr_data[probe_vars > 0, ]
-
-cat("  Probes after filtering:", nrow(expr_filtered), "\n")
-
-if(max(expr_filtered, na.rm = TRUE) > 100) {
-  expr_filtered <- log2(expr_filtered + 1)
-}
-
-expr_normalized <- normalize.quantiles(as.matrix(expr_filtered))
-rownames(expr_normalized) <- rownames(expr_filtered)
-colnames(expr_normalized) <- colnames(expr_filtered)
-
-cat("  ✓ Complete\n\n")
+# Standardize continuous variables
+cox_data$LMOD1 <- scale(cox_data$LMOD1)[,1]
+cox_data$Age <- scale(cox_data$Age)[,1]
 
 # ============================================================================
-# Step 4: Handle missing values
+# Fit Cox model
 # ============================================================================
 
-cat("Step 4: Handling missing values...\n")
+cat("Step 5: Fitting multivariate Cox model...\n\n")
 
-n_missing <- sum(is.na(expr_normalized))
-if(n_missing > 0) {
-  for(i in 1:nrow(expr_normalized)) {
-    row_mean <- mean(expr_normalized[i, ], na.rm = TRUE)
-    expr_normalized[i, is.na(expr_normalized[i, ])] <- row_mean
-  }
-  cat("  Imputed", n_missing, "values\n\n")
-} else {
-  cat("  No missing values\n\n")
-}
+fit <- coxph(Surv(time, status) ~ LMOD1 + Age + Gender + T_stage + N_stage, data = cox_data)
+summary_fit <- summary(fit)
 
-# ============================================================================
-# Step 5: Cox regression
-# ============================================================================
+print(summary_fit)
+cat("\n")
 
-cat("Step 5: Cox regression...\n")
+# Extract results
+coef_data <- summary_fit$coefficients
+conf_data <- summary_fit$conf.int
 
-valid_samples <- !is.na(survival_time) & !is.na(survival_status) & survival_time > 0
+forest_data <- data.frame(
+  Variable = c("LMOD1", "Age", "Gender", "T stage", "N stage"),
+  HR = coef_data[, "exp(coef)"],
+  CI_lower = conf_data[, "lower .95"],
+  CI_upper = conf_data[, "upper .95"],
+  p_value = coef_data[, "Pr(>|z|)"]
+)
 
-survival_time_clean <- survival_time[valid_samples]
-survival_status_clean <- survival_status[valid_samples]
-expr_clean <- expr_normalized[, valid_samples]
+forest_data$Significant <- ifelse(is.na(forest_data$p_value), "No", 
+                                  ifelse(forest_data$p_value < 0.05, "Yes", "No"))
 
-cat("  Samples:", ncol(expr_clean), "\n")
-cat("  Probes:", nrow(expr_clean), "\n")
-
-# Top probes by variance
-probe_vars_clean <- apply(expr_clean, 1, var, na.rm = TRUE)
-top_probe_idx <- order(probe_vars_clean, decreasing = TRUE)[1:min(500, nrow(expr_clean))]
-
-cox_results <- data.frame()
-
-for(i in top_probe_idx) {
-  probe_expr <- expr_clean[i, ]
-  
-  cox_data <- data.frame(
-    time = survival_time_clean,
-    status = survival_status_clean,
-    expr = probe_expr
-  )
-  
-  fit <- tryCatch(
-    coxph(Surv(time, status) ~ expr, data = cox_data),
-    error = function(e) NULL
-  )
-  
-  if(!is.null(fit)) {
-    coef_val <- coef(fit)[1]
-    hr <- exp(coef_val)
-    se_coef <- sqrt(vcov(fit)[1, 1])
-    ci_lower <- exp(coef_val - 1.96 * se_coef)
-    ci_upper <- exp(coef_val + 1.96 * se_coef)
-    pval <- summary(fit)$coefficients[1, 5]
-    
-    cox_results <- rbind(cox_results, data.frame(
-      probe = rownames(expr_clean)[i],
-      HR = hr,
-      CI_lower = ci_lower,
-      CI_upper = ci_upper,
-      p_value = pval
-    ))
-  }
-}
-
-cox_results <- cox_results[order(cox_results$p_value), ]
-
-cat("  ✓ Complete - ", sum(cox_results$p_value < 0.05), "significant\n\n")
+cat("Forest Plot Data:\n")
+print(forest_data)
+cat("\n")
 
 # ============================================================================
-# Step 6: Forest plot
+# Create forest plot
 # ============================================================================
 
 cat("Step 6: Creating forest plot...\n")
 
-top_probes <- cox_results[cox_results$p_value < 0.05, ][1:10, ]
-top_probes <- top_probes[!is.na(top_probes$HR), ]
+forest_plot_data <- forest_data[!is.na(forest_data$HR), ]
+forest_plot_data$Variable <- factor(forest_plot_data$Variable, 
+                                    levels = rev(forest_plot_data$Variable))
 
-if(nrow(top_probes) > 0) {
-  
-  probe_names <- substr(top_probes$probe, 1, 12)
-  
-  forest_data <- data.frame(
-    Probe = probe_names,
-    HR = top_probes$HR,
-    CI_lower = top_probes$CI_lower,
-    CI_upper = top_probes$CI_upper,
-    P_value = top_probes$p_value,
-    Significant = ifelse(top_probes$p_value < 0.05, "Yes", "No")
+p <- ggplot(forest_plot_data, aes(x = HR, y = Variable, color = Significant)) +
+  geom_point(size = 5) +
+  geom_errorbar(aes(xmin = CI_lower, xmax = CI_upper), width = 0.25, linewidth = 1.2, 
+                orientation = "y") +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "gray50", linewidth = 1.2) +
+  scale_color_manual(values = c("Yes" = "#E41A1C", "No" = "#4DAF4A")) +
+  scale_x_continuous(limits = c(0.5, 2.5), breaks = seq(0.5, 2.5, 0.5)) +
+  labs(
+    x = "Hazard Ratio (95% CI)",
+    y = "",
+    color = "p < 0.05"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text = element_text(size = 11),
+    axis.title = element_text(size = 12),
+    panel.grid.major.x = element_line(color = "gray90", linewidth = 0.3),
+    legend.position = "right"
   )
-  
-  png("output_forest_plot.png", width = 10, height = 6, units = "in", res = 300)
-  
-  forest_data$Probe <- factor(forest_data$Probe, levels = rev(forest_data$Probe))
-  
-  p <- ggplot(forest_data, aes(x = HR, y = Probe, color = Significant)) +
-    geom_point(size = 4) +
-    geom_errorbarh(aes(xmin = CI_lower, xmax = CI_upper), height = 0.2, size = 1) +
-    geom_vline(xintercept = 1, linetype = "dashed", color = "gray40", size = 1) +
-    scale_x_log10(breaks = c(0.5, 1, 2, 4, 8)) +
-    scale_color_manual(values = c("Yes" = "#E41A1C", "No" = "#377EB8")) +
-    labs(title = "Forest Plot: Survival-Associated Probes",
-         x = "Hazard Ratio (95% CI)", y = "Probe ID", color = "p < 0.05") +
-    theme_minimal() +
-    theme(plot.title = element_text(size = 14, face = "bold", hjust = 0.5))
-  
-  print(p)
-  dev.off()
-  
-  cat("  ✓ Saved output_forest_plot.png\n\n")
-  
-  write.csv(cox_results, "output_cox_regression_results.csv", row.names = FALSE)
-  write.csv(forest_data, "output_forest_plot_data.csv", row.names = FALSE)
-  
-  cat("  ✓ Saved CSV files\n\n")
-}
 
-cat("============================================================================\n")
-cat("COMPLETE!\n")
-cat("============================================================================\n")
+pdf("output_forest_plot_panel_A.pdf", width = 10, height = 6)
+print(p)
+dev.off()
 
-# ============================================================================
-# Summary
-# ============================================================================
+png("output_forest_plot_panel_A.png", width = 10, height = 6, units = "in", res = 300)
+print(p)
+dev.off()
 
-cat("============================================================================\n")
-cat("ANALYSIS COMPLETE!\n")
-cat("============================================================================\n\n")
+cat(" ✓ Saved: output_forest_plot_panel_A.pdf\n")
+cat(" ✓ Saved: output_forest_plot_panel_A.png\n\n")
 
-cat("Results:\n")
-cat("  Samples analyzed:", ncol(expr_clean), "\n")
-cat("  Total deaths:", sum(survival_status_clean), "\n")
-cat("  Genes analyzed:", nrow(expr_clean), "\n")
-cat("  Significant genes (p<0.05):", sum(cox_results$p_value < 0.05), "\n\n")
+write.csv(forest_data, "output_cox_results.csv", row.names = FALSE)
 
-cat("Output files:\n")
-cat("  1. output_forest_plot.png\n")
-cat("  2. output_cox_regression_results.csv\n")
-cat("  3. output_forest_plot_data.csv\n\n")
-
-cat("============================================================================\n")
