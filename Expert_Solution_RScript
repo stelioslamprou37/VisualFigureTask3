@@ -11,7 +11,7 @@ cat("Panel A: Multivariate Cox Regression - Forest Plot\n")
 cat("============================================================================\n\n")
 
 # Load data
-data_file <- "C:/Users/steli/Desktop/Figure Reproduction Project - Copy/input_data/GSE84437_series_matrix.txt"
+data_file <- file.path("input_data", "GSE84437_series_matrix.txt")
 
 gse84437 <- getGEO(filename = data_file, GSEMatrix = TRUE)
 expr_data <- exprs(gse84437)
