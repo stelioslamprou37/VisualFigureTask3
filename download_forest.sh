@@ -49,7 +49,7 @@ echo ""
 # Download dataset from GEO
 # ============================================================================
 
-GEO_URL="https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE84437&format=file&file=GSE84437_series_matrix.txt.gz"
+GEO_URL="https://ftp.ncbi.nlm.nih.gov/geo/series/GSE84nnn/GSE84437/matrix/GSE84437_series_matrix.txt.gz"
 
 # Check if wget is available
 if ! command -v wget &> /dev/null; then
@@ -115,6 +115,6 @@ if [ -f "${FILEPATH}" ]; then
     echo "============================================================================"
 else
     echo "ERROR: File extraction failed. Please download manually."
-    echo "Manual download: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE84437"
+    echo "Manual download: https://ftp.ncbi.nlm.nih.gov/geo/series/GSE84nnn/GSE84437/matrix/GSE84437_series_matrix.txt.gz"
     exit 1
 fi
