@@ -1,0 +1,78 @@
+{
+  "analysis_id": "forest_plot_panel_a",
+  "paper_title": "Multivariate Cox regression analysis of prognostic genes and therapeutic mechanisms of gastric cancer",
+  "paper_authors": ["Yangyang Xiao", "Zhiru Zhong", "Chunli Yang", "Zhiying Lin"],
+  "paper_journal": "Discover Oncology",
+  "paper_year": 2025,
+  "paper_doi": "10.1007/s12672-025-01907-7",
+  "figure_reproduced": "Figure 3 Panel A",
+  "figure_type": "forest_plot",
+  "dataset_name": "GSE84437",
+  "dataset_source": "NCBI GEO",
+  "dataset_url": "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE84437",
+  "dataset_platform": "Illumina HumanWG-6 v3.0 expression beadchip",
+  "dataset_samples": 433,
+  "dataset_events": 209,
+  "analysis_type": "multivariate_cox_regression",
+  "outcome_variable": "overall_survival",
+  "predictors": ["LMOD1", "Age", "Gender", "T_stage", "N_stage"],
+  "lmod1_probe": "ILMN_1680948",
+  "preprocessing": ["log2_transformation", "z_score_normalization"],
+  "software": {
+    "R_version": "4.x",
+    "packages": ["GEOquery", "limma", "survival", "ggplot2", "dplyr"]
+  },
+  "methods": {
+    "transformation": "log2(expression + 1)",
+    "standardization": "LMOD1 z-score, Age raw",
+    "model": "coxph(Surv(time, status) ~ LMOD1 + Age + Gender + T_stage + N_stage)"
+  },
+  "results": {
+    "LMOD1": {
+      "HR": 1.240,
+      "CI_lower": 1.094,
+      "CI_upper": 1.406,
+      "p_value": 0.00076,
+      "significant": true
+    },
+    "Age": {
+      "HR": 1.026,
+      "CI_lower": 1.012,
+      "CI_upper": 1.041,
+      "p_value": 0.002,
+      "significant": true
+    },
+    "Gender": {
+      "HR": 1.185,
+      "CI_lower": 0.873,
+      "CI_upper": 1.608,
+      "p_value": 0.277,
+      "significant": false
+    },
+    "T_stage": {
+      "HR": 1.508,
+      "CI_lower": 1.176,
+      "CI_upper": 1.933,
+      "p_value": 0.001,
+      "significant": true
+    },
+    "N_stage": {
+      "HR": 1.535,
+      "CI_lower": 1.302,
+      "CI_upper": 1.809,
+      "p_value": 3.27e-07,
+      "significant": true
+    }
+  },
+  "outputs": {
+    "figure": "output_forest_plot_panel_A.png",
+    "csv": "output_cox_results.csv"
+  },
+  "reproducibility": {
+    "status": "partial",
+    "notes": "Paper used TCGA + GSE84437 combined; this analysis uses GSE84437 only. Qualitative results match."
+  },
+  "date_analyzed": "2025-11-07",
+  "analyst": "Stelios Lamprou",
+  "script": "Expert_solution.R"
+}
