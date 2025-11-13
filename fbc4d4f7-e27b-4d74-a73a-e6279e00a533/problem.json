@@ -1,0 +1,29 @@
+{
+  "title": "Multivariate Cox Regression Forest Plot - Gastric Cancer Prognostic Analysis",
+  "description": "Multivariate Cox proportional hazards regression analysis examining the prognostic significance of LMOD1 expression and clinical factors (age, gender, T stage, N stage) in gastric cancer using GSE84437 dataset. Reproduces Figure 3 Panel A showing hazard ratios with 95% confidence intervals.",
+  "paper_title": "Multivariate Cox regression analysis of prognostic genes and therapeutic mechanisms of gastric cancer",
+  "paper_authors": [
+    "Yangyang Xiao",
+    "Zhiru Zhong",
+    "Chunli Yang",
+    "Zhiying Lin"
+  ],
+  "paper_journal": "Discover Oncology",
+  "paper_year": 2025,
+  "paper_doi": "10.1007/s12672-025-01907-7",
+  "figure_reproduced": "Figure 3 Panel A",
+  "dataset": "GSE84437",
+  "dataset_platform": "Illumina HumanWG-6 v3.0 expression beadchip",
+  "sample_size": 433,
+  "events": 209,
+  "analysis_type": "Multivariate Cox proportional hazards regression with forest plot visualization",
+  "predictors": [
+    "LMOD1",
+    "Age",
+    "Gender",
+    "T_stage",
+    "N_stage"
+  ],
+  "outcome": "Overall survival",
+  "key_findings": "LMOD1 (HR=1.240, p<0.001), Age (HR=1.026, p<0.001), T stage (HR=1.508, p=0.001), and N stage (HR=1.535, p<0.001) are significant prognostic factors"
+}
